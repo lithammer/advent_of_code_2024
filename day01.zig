@@ -1,6 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
+const ArrayList = std.ArrayListUnmanaged;
 const AutoHashMap = std.AutoHashMap;
 const expectEqual = std.testing.expectEqual;
 
@@ -20,8 +20,8 @@ fn parseLine(line: []const u8) !struct { left: i32, right: i32 } {
 }
 
 fn part2(allocator: Allocator, input: []const u8) !i64 {
-    var left = ArrayList(i32).init(allocator);
-    defer left.deinit();
+    var left: ArrayList(i32) = .empty;
+    defer left.deinit(allocator);
     var right = AutoHashMap(i32, i32).init(allocator);
     defer right.deinit();
 
@@ -29,7 +29,7 @@ fn part2(allocator: Allocator, input: []const u8) !i64 {
     while (lines.next()) |line| {
         const columns = try parseLine(line);
 
-        try left.append(columns.left);
+        try left.append(allocator, columns.left);
 
         const entry = try right.getOrPutValue(columns.right, 0);
         entry.value_ptr.* += 1;
@@ -47,16 +47,16 @@ fn part2(allocator: Allocator, input: []const u8) !i64 {
 }
 
 fn part1(allocator: Allocator, input: []const u8) !u64 {
-    var left = ArrayList(i32).init(allocator);
-    defer left.deinit();
-    var right = ArrayList(i32).init(allocator);
-    defer right.deinit();
+    var left: ArrayList(i32) = .empty;
+    defer left.deinit(allocator);
+    var right: ArrayList(i32) = .empty;
+    defer right.deinit(allocator);
 
     var lines = std.mem.tokenizeScalar(u8, input, '\n');
     while (lines.next()) |line| {
         const columns = try parseLine(line);
-        try left.append(columns.left);
-        try right.append(columns.right);
+        try left.append(allocator, columns.left);
+        try right.append(allocator, columns.right);
     }
 
     std.mem.sort(i32, left.items, {}, comptime std.sort.asc(i32));
@@ -75,11 +75,14 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const stdout = std.io.getStdOut().writer();
+    var buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&buffer);
+    const stdout = &stdout_writer.interface;
 
     const input = @embedFile("day01.txt");
     try stdout.print("part1: {d}\n", .{try part1(allocator, input)});
     try stdout.print("part2: {d}\n", .{try part2(allocator, input)});
+    try stdout.flush();
 }
 
 test "distance(3, 7) == 4" {
