@@ -1,6 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
+const ArrayList = std.ArrayListUnmanaged;
 const expectEqual = std.testing.expectEqual;
 const expect = std.testing.expect;
 
@@ -32,7 +32,7 @@ const LevelsIterator = struct {
     }
 
     fn window(self: *Self) LevelsWindowIterator {
-        return LevelsWindowIterator{
+        return .{
             .levels = self,
         };
     }
@@ -40,15 +40,10 @@ const LevelsIterator = struct {
 
 fn parseLine(line: []const u8) LevelsIterator {
     const iter = std.mem.tokenizeScalar(u8, line, ' ');
-    return LevelsIterator{
+    return .{
         .levels = iter,
     };
 }
-
-const Direction = enum {
-    positive,
-    negative,
-};
 
 fn isSafe(line: []const u8) bool {
     var descending = true;
@@ -85,15 +80,16 @@ fn part1(input: []const u8) u64 {
 }
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
-    _ = allocator;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
 
-    const stdout = std.io.getStdOut().writer();
+    var buffer: [1024]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&buffer);
+    const stdout = &stdout_writer.interface;
 
     const input = @embedFile("day02.txt");
     try stdout.print("part1: {d}\n", .{part1(input)});
+    try stdout.flush();
 }
 
 test "parseLine()" {
